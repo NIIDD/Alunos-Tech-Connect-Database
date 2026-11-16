@@ -1,0 +1,131 @@
+-- =========================================================================
+-- ALUNOS TECH CONNECT - SCRIPT DE CRIAÇÃO DE TABELAS E ÍNDICES (POSTGRESQL)
+-- =========================================================================
+
+-- Tabela de Perfis de Acesso (US01)
+CREATE TABLE perfil (
+    id SERIAL PRIMARY KEY,
+    nome_perfil VARCHAR(100) NOT NULL,
+    descricao TEXT
+);
+
+-- Tabela de Usuários (US01)
+CREATE TABLE usuario (
+    id SERIAL PRIMARY KEY,
+    nome VARCHAR(150) NOT NULL,
+    email VARCHAR(150) UNIQUE NOT NULL,
+    senha_hash VARCHAR(255) NOT NULL,
+    perfil_id INT REFERENCES perfil(id),
+    ativo BOOLEAN DEFAULT TRUE,
+    data_criacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela de Clientes Corporativos (US04, US15)
+CREATE TABLE cliente (
+    id SERIAL PRIMARY KEY,
+    razao_social VARCHAR(150) NOT NULL,
+    nome_fantasia VARCHAR(150),
+    cnpj VARCHAR(20) UNIQUE NOT NULL,
+    email_contato VARCHAR(150),
+    telefone VARCHAR(30),
+    lgpd_anonimizado BOOLEAN DEFAULT FALSE,
+    data_cadastro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela de Serviços com SLA (US05)
+CREATE TABLE servico (
+    id SERIAL PRIMARY KEY,
+    nome_servico VARCHAR(100) NOT NULL,
+    descricao TEXT,
+    tempo_sla_horas INT DEFAULT 24
+);
+
+-- Tabela de Relacionamento Cliente x Serviço
+CREATE TABLE cliente_servico (
+    id SERIAL PRIMARY KEY,
+    cliente_id INT REFERENCES cliente(id),
+    servico_id INT REFERENCES servico(id),
+    data_contratacao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ativo BOOLEAN DEFAULT TRUE
+);
+
+-- Tabela de Equipes (US07)
+CREATE TABLE equipe (
+    id SERIAL PRIMARY KEY,
+    nome_equipe VARCHAR(100) NOT NULL,
+    gestor_id INT REFERENCES usuario(id)
+);
+
+-- Tabela Associativa Colaborador x Equipe (N:N)
+CREATE TABLE usuario_equipe (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT REFERENCES usuario(id),
+    equipe_id INT REFERENCES equipe(id)
+);
+
+-- Tabela de Solicitações / Chamados (US06, US09)
+CREATE TABLE solicitacao (
+    id SERIAL PRIMARY KEY,
+    cliente_id INT REFERENCES cliente(id),
+    servico_id INT REFERENCES servico(id),
+    usuario_cliente_id INT REFERENCES usuario(id),
+    status VARCHAR(50) DEFAULT 'Aberta',
+    prioridade VARCHAR(20) DEFAULT 'Média',
+    data_abertura TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    data_limite_sla TIMESTAMP
+);
+
+-- Tabela de Tarefas Operacionais no Mobile (US10)
+CREATE TABLE tarefa (
+    id SERIAL PRIMARY KEY,
+    solicitacao_id INT REFERENCES solicitacao(id),
+    equipe_id INT REFERENCES equipe(id),
+    colaborador_id INT REFERENCES usuario(id),
+    status_tarefa VARCHAR(50) DEFAULT 'Pendente',
+    descricao TEXT,
+    data_atribuicao TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    versao_concorrencia INT DEFAULT 1
+);
+
+-- Tabela de Comentários nas Solicitações (US12)
+CREATE TABLE comentario (
+    id SERIAL PRIMARY KEY,
+    solicitacao_id INT REFERENCES solicitacao(id),
+    usuario_id INT REFERENCES usuario(id),
+    texto_comentario TEXT NOT NULL,
+    data_comentario TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela de Notificações e Alertas (US11)
+CREATE TABLE notificacao (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT REFERENCES usuario(id),
+    titulo VARCHAR(150) NOT NULL,
+    mensagem TEXT NOT NULL,
+    lida BOOLEAN DEFAULT FALSE,
+    data_envio TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Tabela de Auditoria e Log de Acessos (US08)
+CREATE TABLE log_acesso (
+    id SERIAL PRIMARY KEY,
+    usuario_id INT REFERENCES usuario(id),
+    acao_realizada VARCHAR(150) NOT NULL,
+    endereco_ip VARCHAR(50),
+    data_hora TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+-- ÍNDICES DE OTIMIZAÇÃO (Performance para Joins e Painéis - US13)
+
+CREATE INDEX IF NOT EXISTS idx_solicitacao_status_data ON solicitacao (status, data_abertura);
+CREATE INDEX IF NOT EXISTS idx_tarefa_colaborador_status ON tarefa (colaborador_id, status_tarefa);
+
+CREATE INDEX IF NOT EXISTS idx_fk_usuario_perfil ON usuario (perfil_id);
+CREATE INDEX IF NOT EXISTS idx_fk_solicitacao_cliente ON solicitacao (cliente_id);
+CREATE INDEX IF NOT EXISTS idx_fk_solicitacao_servico ON solicitacao (servico_id);
+CREATE INDEX IF NOT EXISTS idx_fk_tarefa_solicitacao ON tarefa (solicitacao_id);
+CREATE INDEX IF NOT EXISTS idx_fk_tarefa_equipe ON tarefa (equipe_id);
+CREATE INDEX IF NOT EXISTS idx_fk_comentario_solicitacao ON comentario (solicitacao_id);
+CREATE INDEX IF NOT EXISTS idx_fk_notificacao_usuario ON notificacao (usuario_id);
+CREATE INDEX IF NOT EXISTS idx_fk_log_usuario ON log_acesso (usuario_id);
